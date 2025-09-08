@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Solo Leveling</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<!-- Nota: body inicia con class="no-ui" para ocultar toda la app detrás del login -->
+<body class="no-ui">
+  <!-- ===== AUTH (obliga registro/login) ===== -->
+  <div id="auth-overlay" class="auth-overlay">
+    <div class="auth-card">
+      <h2 class="auth-title">Crea tu cuenta</h2>
+      <div class="tabs" role="tablist">
+        <button id="tabRegister" class="tab active" role="tab" aria-selected="true">Crear cuenta</button>
+        <button id="tabLogin" class="tab" role="tab" aria-selected="false">Entrar</button>
+      </div>
+
+      <form id="formRegister" class="auth-form" autocomplete="off">
+        <label>Correo</label>
+        <input id="regEmail" type="email" placeholder="tu@correo.com" required />
+        <label>Contraseña</label>
+        <input id="regPass" type="password" placeholder="Mínimo 6 caracteres" minlength="6" required />
+        <button type="submit" class="btn wfull" id="btnDoRegister">Crear cuenta</button>
+        <div id="regMsg" class="muted"></div>
+      </form>
+
+      <form id="formLogin" class="auth-form hidden" autocomplete="off">
+        <label>Correo</label>
+        <input id="loginEmail" type="email" placeholder="tu@correo.com" required />
+        <label>Contraseña</label>
+        <input id="loginPass" type="password" placeholder="••••••••" required />
+        <button type="submit" class="btn wfull" id="btnDoLogin">Entrar</button>
+        <button type="button" id="btnReset" class="btn ghost wfull">¿Olvidaste tu contraseña?</button>
+        <div id="authMsg" class="muted"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===== MODALES de bienvenida (SOLO UNA VEZ) ===== -->
+  <div id="alarm-overlay" class="alarm-overlay hidden" aria-hidden="true">
+    <div class="alarm-window" role="dialog" aria-modal="true" aria-labelledby="alarm-title" aria-describedby="alarm-text">
+      <header class="alarm-header">
+        <span class="alarm-badge">i</span>
+        <h2 id="alarm-title" class="alarm-title">ALARMA</h2>
+      </header>
+      <div class="alarm-body">
+        <div id="alarm-text" class="alarm-text"></div>
+      </div>
+      <button id="alarm-accept" class="btn pill">Aceptar</button>
+    </div>
+  </div>
+
+  <!-- ===== TOPBAR ===== -->
+  <header class="topbar hidden" id="topbar">
+    <button class="icon-ghost" aria-label="Notificaciones" title="Notificaciones">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+        <path fill="currentColor" d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2Zm6-6v-5a6 6 0 1 0-12 0v5l-2 2v1h16v-1l-2-2Z"/>
+      </svg>
+    </button>
+    <div class="top-spacer"></div>
+    <button id="menuBtn" class="icon-ghost" aria-label="Abrir menú" title="Menú">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </button>
+  </header>
+
+  <!-- ===== MENÚ LATERAL ===== -->
+  <aside id="sideMenu" class="side-menu" aria-hidden="true">
+    <div class="side-header">
+      <div class="brand">Solo Leveling</div>
+      <button id="closeSide" class="icon-ghost" aria-label="Cerrar menú">✖</button>
+    </div>
+    <nav class="side-nav">
+      <button class="side-link active" data-view="home">🏠 Quests</button>
+      <button class="side-link" data-view="friends">👥 Amigos</button>
+      <button id="btnSignOut" class="side-link danger">⎋ Cerrar sesión</button>
+    </nav>
+  </aside>
+  <div id="sideOverlay" class="side-overlay" hidden></div>
+
+  <!-- ===== CONTENIDO ===== -->
+  <main id="app" class="container hidden">
+    <!-- HOME -->
+    <section id="homeView" class="view current">
+      <!-- Tarjeta encabezado “Daily Training” -->
+      <section class="card training-card">
+        <div class="training-left">
+          <div class="dots"><span></span><span></span><span></span></div>
+          <div class="titles">
+            <div class="t1">Daily Training</div>
+            <div class="t2"><span id="pendingCount">4</span> ejercicios restantes</div>
+          </div>
+        </div>
+        <div class="training-right">
+          <div class="progress-ring">
+            <svg viewBox="0 0 36 36">
+              <path class="bg" d="M18 2a16 16 0 1 1 0 32a16 16 0 1 1 0-32"/>
+              <path id="ring" class="fg" d="M18 2a16 16 0 1 1 0 32a16 16 0 1 1 0-32"/>
+            </svg>
+            <div id="progressText" class="ring-text">0%</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel DAILY QUEST -->
+      <section class="panel quest-panel">
+        <div class="panel-head">
+          <span class="info-ico">i</span>
+          <h3>DAILY QUEST</h3>
+        </div>
+
+        <p class="quest-desc">[Entrenamiento para volverte un gran guerrero.]</p>
+        <h4 class="subtitle">OBJETIVOS</h4>
+
+        <ul id="questsList" class="q-list">
+          <li class="q-item" data-id="flexiones" data-max="100">
+            <span class="q-name">Flexiones</span><span class="q-progress">[0/100]</span>
+            <label class="q-check"><input type="checkbox" class="q-toggle"/><span></span></label>
+          </li>
+          <li class="q-item" data-id="sentadillas" data-max="100">
+            <span class="q-name">Sentadillas</span><span class="q-progress">[0/100]</span>
+            <label class="q-check"><input type="checkbox" class="q-toggle"/><span></span></label>
+          </li>
+          <li class="q-item" data-id="abdominales1" data-max="100">
+            <span class="q-name">Abdominales</span><span class="q-progress">[0/100]</span>
+            <label class="q-check"><input type="checkbox" class="q-toggle"/><span></span></label>
+          </li>
+          <li class="q-item" data-id="correr" data-max="10" data-unit="km">
+            <span class="q-name">Correr</span><span class="q-progress">[0/10km]</span>
+            <label class="q-check"><input type="checkbox" class="q-toggle"/><span></span></label>
+          </li>
+        </ul>
+
+        <p class="alert">¡ATENCIÓN! — No completar la quest en el tiempo impartido ocasionará una penalización.</p>
+
+        <div class="timer-block">
+          <div class="timer-ico">⏱</div>
+          <div id="dailyCountdown" class="timer">00:00:00</div>
+        </div>
+      </section>
+    </section>
+
+    <!-- AMIGOS -->
+    <section id="friendsView" class="view hidden">
+      <section class="panel friends-panel">
+        <h3>Amigos</h3>
+        <form id="addFriendForm" class="add-friend-form" autocomplete="off">
+          <input id="friendEmail" type="email" placeholder="Correo del amigo" required />
+          <button class="btn" type="submit">Agregar</button>
+          <span id="friendMsg" class="muted"></span>
+        </form>
+        <div id="friendsList" class="friends-list"></div>
+      </section>
+    </section>
+  </main>
+
+  <!-- ===== Bottom navigation ===== -->
+  <nav class="bottom-nav" aria-label="Navegación inferior">
+    <button class="btnc active" title="Inicio" data-view="home">🏠</button>
+    <button class="btnc" title="Progreso">📈</button>
+    <button class="btnc" title="Amigos" data-view="friends">👥</button>
+  </nav>
+
+  <!-- ===== Firebase (compat) ===== -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+
+  <!-- ===== App ===== -->
+  <script src="app.js"></script>
+</body>
+</html>
