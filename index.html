@@ -6,11 +6,10 @@
   <title>Solo Leveling</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
-<!-- Nota: body inicia con class="no-ui" para ocultar toda la app detrás del login -->
 <body class="no-ui">
-  <!-- ===== AUTH (obliga registro/login) ===== -->
+  <!-- ===== AUTH ===== -->
   <div id="auth-overlay" class="auth-overlay">
-    <div class="auth-card">
+    <div class="auth-card has-runes">
       <h2 class="auth-title">Crea tu cuenta</h2>
       <div class="tabs" role="tablist">
         <button id="tabRegister" class="tab active" role="tab" aria-selected="true">Crear cuenta</button>
@@ -38,9 +37,9 @@
     </div>
   </div>
 
-  <!-- ===== MODALES de bienvenida (SOLO UNA VEZ) ===== -->
+  <!-- ===== INTRO (1 sola vez) ===== -->
   <div id="alarm-overlay" class="alarm-overlay hidden" aria-hidden="true">
-    <div class="alarm-window" role="dialog" aria-modal="true" aria-labelledby="alarm-title" aria-describedby="alarm-text">
+    <div class="alarm-window has-runes" role="dialog" aria-modal="true" aria-labelledby="alarm-title" aria-describedby="alarm-text">
       <header class="alarm-header">
         <span class="alarm-badge">i</span>
         <h2 id="alarm-title" class="alarm-title">ALARMA</h2>
@@ -54,15 +53,12 @@
 
   <!-- ===== TOPBAR ===== -->
   <header class="topbar hidden" id="topbar">
-    <button class="icon-ghost" aria-label="Notificaciones" title="Notificaciones">
-      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-        <path fill="currentColor" d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2Zm6-6v-5a6 6 0 1 0-12 0v5l-2 2v1h16v-1l-2-2Z"/>
-      </svg>
-    </button>
-    <div class="top-spacer"></div>
     <button id="menuBtn" class="icon-ghost" aria-label="Abrir menú" title="Menú">
       <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
     </button>
+    <div class="top-spacer"></div>
+    <button id="editTopBtn" class="icon-ghost" aria-label="Editar perfil" title="Editar perfil">✎</button>
+    <input id="hiddenFile" type="file" accept="image/*" class="hidden" />
   </header>
 
   <!-- ===== MENÚ LATERAL ===== -->
@@ -74,6 +70,7 @@
     <nav class="side-nav">
       <button class="side-link active" data-view="home">🏠 Quests</button>
       <button class="side-link" data-view="friends">👥 Amigos</button>
+      <button class="side-link" data-view="profile">👤 Perfil</button>
       <button id="btnSignOut" class="side-link danger">⎋ Cerrar sesión</button>
     </nav>
   </aside>
@@ -83,8 +80,7 @@
   <main id="app" class="container hidden">
     <!-- HOME -->
     <section id="homeView" class="view current">
-      <!-- Tarjeta encabezado “Daily Training” -->
-      <section class="card training-card">
+      <section class="card training-card has-runes">
         <div class="training-left">
           <div class="dots"><span></span><span></span><span></span></div>
           <div class="titles">
@@ -103,13 +99,11 @@
         </div>
       </section>
 
-      <!-- Panel DAILY QUEST -->
-      <section class="panel quest-panel">
+      <section class="panel quest-panel has-runes">
         <div class="panel-head">
           <span class="info-ico">i</span>
           <h3>DAILY QUEST</h3>
         </div>
-
         <p class="quest-desc">[Entrenamiento para volverte un gran guerrero.]</p>
         <h4 class="subtitle">OBJETIVOS</h4>
 
@@ -143,7 +137,7 @@
 
     <!-- AMIGOS -->
     <section id="friendsView" class="view hidden">
-      <section class="panel friends-panel">
+      <section class="panel friends-panel has-runes">
         <h3>Amigos</h3>
         <form id="addFriendForm" class="add-friend-form" autocomplete="off">
           <input id="friendEmail" type="email" placeholder="Correo del amigo" required />
@@ -153,21 +147,69 @@
         <div id="friendsList" class="friends-list"></div>
       </section>
     </section>
+
+    <!-- PERFIL (propio) -->
+    <section id="profileView" class="view hidden">
+      <section class="panel profile-panel has-runes">
+        <div class="profile-card has-runes" id="selfProfileCard">
+          <div class="pc-header">
+            <div class="pc-frame"><img id="pcAvatar" alt="Avatar"></div>
+          </div>
+
+          <h2 id="pcName" class="pc-name">GUERRERO123</h2>
+
+          <div class="level-row">
+            <div class="pill left">NIVEL <span id="pcLevel">1</span></div>
+            <div class="pill right"><span id="pcXp">0</span>/<span id="pcXpMax">1000</span></div>
+          </div>
+
+          <div class="rank-row">
+            <div class="rank-line"></div>
+            <div class="rank-pill">RANGO <span id="pcRank">E</span></div>
+            <div class="rank-line"></div>
+          </div>
+
+          <div class="section-box">
+            <div class="section-title">LOGROS</div>
+            <div class="badges">
+              <div class="badge b1"></div><div class="badge b2"></div>
+              <div class="badge b3"></div><div class="badge b4"></div>
+            </div>
+          </div>
+
+          <div class="section-title spaced">ESTADÍSTICAS</div>
+          <div class="stats">
+            <div class="stat">
+              <svg viewBox="0 0 36 36"><path class="sg" d="M18 2a16 16 0 1 1 0 32a16 16 0 1 1 0-32"/><path id="stF" class="sf" d="M18 2a16 16 0 1 1 0 32a16 16 0 1 1 0-32"/></svg>
+              <div class="sv"><span id="stFuerza">85</span></div><div class="sc">FUERZA</div>
+            </div>
+            <div class="stat">
+              <svg viewBox="0 0 36 36"><path class="sg" d="M18 2a16 16 0 1 1 0 32a16 16 0 1 1 0-32"/><path id="stR" class="sf" d="M18 2a16 16 0 1 1 0 32a16 16 0 1 1 0-32"/></svg>
+              <div class="sv"><span id="stRes">72</span></div><div class="sc">RESISTENCIA</div>
+            </div>
+            <div class="stat">
+              <svg viewBox="0 0 36 36"><path class="sg" d="M18 2a16 16 0 1 1 0 32a16 16 0 1 1 0-32"/><path id="stA" class="sf" d="M18 2a16 16 0 1 1 0 32a16 16 0 1 1 0-32"/></svg>
+              <div class="sv"><span id="stAgi">60</span></div><div class="sc">AGILIDAD</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- PERFIL PÚBLICO -->
+    <section id="publicProfileView" class="view hidden">
+      <section class="panel has-runes">
+        <button id="ppBack" class="btn ghost small">← Volver</button>
+        <div class="profile-card has-runes" id="friendProfileCard"></div>
+      </section>
+    </section>
   </main>
 
-  <!-- ===== Bottom navigation ===== -->
-  <nav class="bottom-nav" aria-label="Navegación inferior">
-    <button class="btnc active" title="Inicio" data-view="home">🏠</button>
-    <button class="btnc" title="Progreso">📈</button>
-    <button class="btnc" title="Amigos" data-view="friends">👥</button>
-  </nav>
-
-  <!-- ===== Firebase (compat) ===== -->
+  <!-- Firebase (sin Storage) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
 
-  <!-- ===== App ===== -->
   <script src="app.js"></script>
 </body>
 </html>
