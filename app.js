@@ -119,83 +119,8 @@
   function cleanUsername(u){ return (u||"").trim().replace(/\s+/g,"_"); }
   function isValidUsername(u){ return /^[a-zA-Z0-9_]{3,20}$/.test(u); }
 
-  // ===== Registro (con username único) =====
-  formRegister.addEventListener("submit", async (e)=>{
-    e.preventDefault();
-    regMsg.textContent="Verificando nombre de usuario…";
-    try{
-      let username = cleanUsername(regUser.value);
-      if(!isValidUsername(username)){
-        regMsg.textContent = "El nombre de usuario debe tener 3–20 caracteres (letras, números o _).";
-        return;
-      }
-      const usernameLower = username.toLowerCase();
-      const exists = await db.collection("users")
-        .where("usernameLower","==",usernameLower)
-        .limit(1).get();
-      if(!exists.empty){
-        regMsg.textContent = "Ese nombre de usuario ya está en uso. Elige otro.";
-        return;
-      }
-
-      regMsg.textContent="Creando cuenta…";
-      const cred = await auth.createUserWithEmailAndPassword(regEmail.value, regPass.value);
-
-      await db.collection("users").doc(cred.user.uid).set({
-        email: regEmail.value,
-        username, usernameLower,
-        profile: {
-          name: username,
-          avatar: "",
-          level: 1, xp: 0, xpMax: 1000, rank: "E",
-          stats: { fuerza:85, resistencia:72, agilidad:60 }
-        },
-        quests: {},
-        createdAt: Date.now()
-      }, { merge: true });
-
-      regMsg.textContent="Cuenta creada. Entrando…";
-    }catch(err){
-      regMsg.textContent="Error: " + (err?.message || err?.code || err);
-    }
-  });
-
-  // ===== Login =====
-  formLogin.addEventListener("submit", async (e)=>{
-    e.preventDefault();
-    authMsg.textContent="Entrando…";
-    try{ await auth.signInWithEmailAndPassword(loginEmail.value, loginPass.value); authMsg.textContent=""; }
-    catch(err){
-      if(err && (err.code==="auth/user-not-found"||/user-not-found/i.test(err.message))){
-        authMsg.textContent="No existe esa cuenta. Crea tu cuenta primero."; showRegister(); regEmail.value=loginEmail.value;
-      } else { authMsg.textContent="Error: " + (err.message || err.code); }
-    }
-  });
-  btnReset.addEventListener("click", async ()=>{
-    const email = loginEmail.value.trim(); if(!email){ authMsg.textContent="Escribe tu correo arriba."; return; }
-    try{ await auth.sendPasswordResetEmail(email); authMsg.textContent="Te enviamos el correo."; }
-    catch(err){ authMsg.textContent="Error: " + (err.message || err.code); }
-  });
-
-  // ===== Drawer & vistas =====
-  function openDrawer(){ sideMenu.classList.add("open"); sideOverlay.hidden=false; }
-  function closeDrawer(){ sideMenu.classList.remove("open"); sideOverlay.hidden=true; }
-  menuBtn.addEventListener("click", openDrawer);
-  closeSide.addEventListener("click", closeDrawer);
-  sideOverlay.addEventListener("click", closeDrawer);
-
-  function setView(v){
-    navLinks.forEach(n=>n.classList.toggle("active", n.dataset.view===v));
-    homeView.classList.toggle("hidden", v!=="home");
-    friendsView.classList.toggle("hidden", v!=="friends");
-    profileView.classList.toggle("hidden", v!=="profile");
-    publicProfileView.classList.add("hidden");
-  }
-  navLinks.forEach(n=>n.addEventListener("click", ()=>{ setView(n.dataset.view); closeDrawer(); }));
-  btnSignOut.addEventListener("click", ()=> auth.signOut());
-
-  // ===== MODAL USERNAME (para cuentas antiguas) =====
-  function openUsernameModal() {
+  // ===== MODAL USERNAME (reutilizable) =====
+  function openUsernameModal(prefill = "") {
     return new Promise((resolve) => {
       const modal = document.getElementById("usernameModal");
       const form  = document.getElementById("unameForm");
@@ -203,12 +128,12 @@
       const msg   = document.getElementById("unameMsg");
       const save  = document.getElementById("unameSave");
 
-      input.value = "";
+      input.value = prefill ? cleanUsername(prefill) : "";
       msg.textContent = "";
       modal.classList.remove("hidden");
       modal.setAttribute("aria-hidden","false");
       document.body.classList.add("uname-open");
-      input.focus();
+      setTimeout(()=>input.focus(), 50);
 
       async function onSubmit(e){
         e.preventDefault();
@@ -251,13 +176,13 @@
     });
   }
 
-  async function ensureUsernameWithModal(uid){
+  async function ensureUsernameWithModal(uid, prefill = ""){
     const ref = db.collection("users").doc(uid);
     const snap = await ref.get();
     const data = snap.data() || {};
     if (data.username && data.usernameLower) return;
 
-    const uname = await openUsernameModal();
+    const uname = await openUsernameModal(prefill);
     await ref.set({
       username: uname,
       usernameLower: uname.toLowerCase(),
@@ -268,6 +193,65 @@
     }, { merge:true });
     alert(`¡Listo! Tu nombre de usuario es @${uname}`);
   }
+
+  // ===== Registro (Opción A: primero auth, luego username) =====
+  formRegister.addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    regMsg.textContent="Creando cuenta…";
+    try{
+      // 1) Crear la cuenta (esto autentica al usuario → ya hay request.auth en reglas)
+      const cred = await auth.createUserWithEmailAndPassword(regEmail.value, regPass.value);
+
+      // 2) Crear doc base mínimo (sin username aún)
+      await db.collection("users").doc(cred.user.uid).set({
+        email: regEmail.value,
+        quests: {},
+        createdAt: Date.now()
+      }, { merge:true });
+
+      // 3) Pedir/validar username con modal (prefill con lo que escribió en el form)
+      await ensureUsernameWithModal(cred.user.uid, regUser.value);
+
+      regMsg.textContent = "Cuenta creada. Entrando…";
+      // El flujo continúa en onAuthStateChanged
+    }catch(err){
+      regMsg.textContent="Error: " + (err?.message || err?.code || err);
+    }
+  });
+
+  // ===== Login =====
+  formLogin.addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    authMsg.textContent="Entrando…";
+    try{ await auth.signInWithEmailAndPassword(loginEmail.value, loginPass.value); authMsg.textContent=""; }
+    catch(err){
+      if(err && (err.code==="auth/user-not-found"||/user-not-found/i.test(err.message))){
+        authMsg.textContent="No existe esa cuenta. Crea tu cuenta primero."; showRegister(); regEmail.value=loginEmail.value;
+      } else { authMsg.textContent="Error: " + (err.message || err.code); }
+    }
+  });
+  btnReset.addEventListener("click", async ()=>{
+    const email = loginEmail.value.trim(); if(!email){ authMsg.textContent="Escribe tu correo arriba."; return; }
+    try{ await auth.sendPasswordResetEmail(email); authMsg.textContent="Te enviamos el correo."; }
+    catch(err){ authMsg.textContent="Error: " + (err.message || err.code); }
+  });
+
+  // ===== Drawer & vistas =====
+  function openDrawer(){ sideMenu.classList.add("open"); sideOverlay.hidden=false; }
+  function closeDrawer(){ sideMenu.classList.remove("open"); sideOverlay.hidden=true; }
+  menuBtn.addEventListener("click", openDrawer);
+  closeSide.addEventListener("click", closeDrawer);
+  sideOverlay.addEventListener("click", closeDrawer);
+
+  function setView(v){
+    navLinks.forEach(n=>n.classList.toggle("active", n.dataset.view===v));
+    homeView.classList.toggle("hidden", v!=="home");
+    friendsView.classList.toggle("hidden", v!=="friends");
+    profileView.classList.toggle("hidden", v!=="profile");
+    publicProfileView.classList.add("hidden");
+  }
+  navLinks.forEach(n=>n.addEventListener("click", ()=>{ setView(n.dataset.view); closeDrawer(); }));
+  btnSignOut.addEventListener("click", ()=> auth.signOut());
 
   // ===== Auth state =====
   let unsubFriends=null;
@@ -280,7 +264,7 @@
     }
     setAuthVisible(false);
 
-    // Asegura username (si la cuenta es vieja)
+    // Asegurar username (para cuentas antiguas o recién creadas sin username)
     await ensureUsernameWithModal(user.uid);
 
     if(!local.getIntro()){
@@ -545,10 +529,27 @@
   ppBack.addEventListener("click", ()=>{ publicProfileView.classList.add("hidden"); friendsView.classList.remove("hidden"); });
 
   // ===== Intro text =====
-  function paintIntro(stepTxt){ textEl.innerHTML = stepTxt; }
+  function openIntro(){ overlay.classList.remove("hidden"); titleEl.textContent="ALARMA"; textEl.innerHTML=STEP1; step=1; }
+  let step=1;
+  const STEP1 = `[Has completado todos los requerimientos necesarios<br/>para la quest secreta ‘Coraje del Débil’.]`;
+  const STEP2 = `[Bienvenido, <span class="emph-green">Jugador</span>.]`;
+  const STEP3 = `<div>[Entrenamiento para volverte un gran guerrero.]</div>
+                 <div style="margin-top:8px;font-weight:800;letter-spacing:.1em">OBJETIVOS</div>
+                 <div class="muted" style="margin-top:6px">Completa los ejercicios listados.</div>`;
+  function closeIntro(){ overlay.classList.add("hidden"); document.body.classList.remove("intro-open"); }
+  alarmBtn.addEventListener("click", async ()=>{
+    if(step===1){ textEl.innerHTML=STEP2; step=2; return; }
+    if(step===2){ titleEl.textContent="DIRECCIONES DE LA QUEST"; textEl.innerHTML=STEP3; step=3; return; }
+    local.setIntro(); closeIntro(); appVisible(true);
+    const uid=auth.currentUser?.uid; if(uid){ ensureDailyReset(uid); await loadAll(uid); startDailyCountdown(uid); subscribeFriends(uid); }
+  });
 
   // ===== Pintar local al arranque =====
-  function paintLocalOnBoot(){ paintQuests(local.getQuests()); }
+  function paintLocalOnBoot(){ 
+    const saved = local.getIntro();
+    if(!saved){ document.body.classList.add("intro-open"); }
+    paintQuests((()=>{ try{return JSON.parse(localStorage.getItem(QUESTS_KEY)||"{}");}catch{return{};} })());
+  }
   paintLocalOnBoot();
 
 })();
