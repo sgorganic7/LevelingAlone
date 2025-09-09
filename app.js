@@ -66,8 +66,7 @@
   // Amigos (por username)
   const addFriendForm = document.getElementById("addFriendForm");
   const friendUsernameInput = document.getElementById("friendUsername");
-  theFriendMsg = document.getElementById("friendMsg");
-  const friendMsg = theFriendMsg; // evitar sombra por minificadores
+  const friendMsg = document.getElementById("friendMsg");
   const friendsList = document.getElementById("friendsList");
 
   // Perfil propio
@@ -110,8 +109,16 @@
   setAuthVisible(true); appVisible(false);
 
   // ===== Tabs Auth =====
-  function showRegister(){ tabRegister.classList.add("active"); tabLogin.classList.remove("active"); formRegister.classList.remove("hidden"); formLogin.classList.add("hidden"); regMsg.textContent=""; authMsg.textContent=""; }
-  function showLogin(){ tabLogin.classList.add("active"); tabRegister.classList.remove("active"); formLogin.classList.remove("hidden"); formRegister.classList.add("hidden"); regMsg.textContent=""; authMsg.textContent=""; }
+  function showRegister(){ 
+    tabRegister.classList.add("active"); tabLogin.classList.remove("active"); 
+    formRegister.classList.remove("hidden"); formLogin.classList.add("hidden"); 
+    regMsg.textContent=""; authMsg.textContent=""; 
+  }
+  function showLogin(){ 
+    tabLogin.classList.add("active"); tabRegister.classList.remove("active"); 
+    formLogin.classList.remove("hidden"); formRegister.classList.add("hidden"); 
+    regMsg.textContent=""; authMsg.textContent=""; 
+  }
   tabRegister.addEventListener("click", showRegister);
   tabLogin.addEventListener("click", showLogin);
 
@@ -119,7 +126,7 @@
   function cleanUsername(u){ return (u||"").trim().replace(/\s+/g,"_"); }
   function isValidUsername(u){ return /^[a-zA-Z0-9_]{3,20}$/.test(u); }
 
-  // ===== MODAL USERNAME (reutilizable) =====
+  // ===== MODAL USERNAME =====
   function openUsernameModal(prefill = "") {
     return new Promise((resolve) => {
       const modal = document.getElementById("usernameModal");
@@ -194,26 +201,26 @@
     alert(`¡Listo! Tu nombre de usuario es @${uname}`);
   }
 
-  // ===== Registro (Opción A: primero auth, luego username) =====
+  // ===== Registro (primero auth, luego username) =====
   formRegister.addEventListener("submit", async (e)=>{
     e.preventDefault();
     regMsg.textContent="Creando cuenta…";
     try{
-      // 1) Crear la cuenta (esto autentica al usuario → ya hay request.auth en reglas)
+      // 1) Crear la cuenta (autentica al usuario)
       const cred = await auth.createUserWithEmailAndPassword(regEmail.value, regPass.value);
 
-      // 2) Crear doc base mínimo (sin username aún)
+      // 2) Doc base mínimo (sin username aún)
       await db.collection("users").doc(cred.user.uid).set({
         email: regEmail.value,
         quests: {},
         createdAt: Date.now()
       }, { merge:true });
 
-      // 3) Pedir/validar username con modal (prefill con lo que escribió en el form)
+      // 3) Pedir/validar username con modal (prefill del input)
       await ensureUsernameWithModal(cred.user.uid, regUser.value);
 
       regMsg.textContent = "Cuenta creada. Entrando…";
-      // El flujo continúa en onAuthStateChanged
+      // onAuthStateChanged continuará
     }catch(err){
       regMsg.textContent="Error: " + (err?.message || err?.code || err);
     }
@@ -223,11 +230,17 @@
   formLogin.addEventListener("submit", async (e)=>{
     e.preventDefault();
     authMsg.textContent="Entrando…";
-    try{ await auth.signInWithEmailAndPassword(loginEmail.value, loginPass.value); authMsg.textContent=""; }
+    try{ 
+      await auth.signInWithEmailAndPassword(loginEmail.value, loginPass.value); 
+      authMsg.textContent=""; 
+    }
     catch(err){
       if(err && (err.code==="auth/user-not-found"||/user-not-found/i.test(err.message))){
-        authMsg.textContent="No existe esa cuenta. Crea tu cuenta primero."; showRegister(); regEmail.value=loginEmail.value;
-      } else { authMsg.textContent="Error: " + (err.message || err.code); }
+        authMsg.textContent="No existe esa cuenta. Crea tu cuenta primero."; 
+        showRegister(); regEmail.value=loginEmail.value;
+      } else { 
+        authMsg.textContent="Error: " + (err.message || err.code); 
+      }
     }
   });
   btnReset.addEventListener("click", async ()=>{
@@ -253,32 +266,7 @@
   navLinks.forEach(n=>n.addEventListener("click", ()=>{ setView(n.dataset.view); closeDrawer(); }));
   btnSignOut.addEventListener("click", ()=> auth.signOut());
 
-  // ===== Auth state =====
-  let unsubFriends=null;
-  auth.onAuthStateChanged(async (user)=>{
-    if(!user){
-      setAuthVisible(true); appVisible(false);
-      overlay.classList.add("hidden"); document.body.classList.remove("intro-open");
-      if(unsubFriends){ unsubFriends(); unsubFriends=null; }
-      return;
-    }
-    setAuthVisible(false);
-
-    // Asegurar username (para cuentas antiguas o recién creadas sin username)
-    await ensureUsernameWithModal(user.uid);
-
-    if(!local.getIntro()){
-      document.body.classList.add("intro-open"); openIntro();
-    }else{
-      document.body.classList.remove("intro-open"); appVisible(true);
-      ensureDailyReset(user.uid);
-      await loadAll(user.uid);
-      startDailyCountdown(user.uid);
-      subscribeFriends(user.uid);
-    }
-  });
-
-  // ===== Intro única =====
+  // ===== Intro (1 sola vez) =====
   let step=1;
   const STEP1 = `[Has completado todos los requerimientos necesarios<br/>para la quest secreta ‘Coraje del Débil’.]`;
   const STEP2 = `[Bienvenido, <span class="emph-green">Jugador</span>.]`;
@@ -447,7 +435,6 @@
     let raw = (friendUsernameInput.value || "").trim();
 
     try{
-      // Permite temporalmente email (compatibilidad) o username
       let targetSnap = null;
       if (raw.includes("@")) {
         const byEmail = await db.collection("users").where("email","==", raw.toLowerCase()).limit(1).get();
@@ -528,28 +515,36 @@
   }
   ppBack.addEventListener("click", ()=>{ publicProfileView.classList.add("hidden"); friendsView.classList.remove("hidden"); });
 
-  // ===== Intro text =====
-  function openIntro(){ overlay.classList.remove("hidden"); titleEl.textContent="ALARMA"; textEl.innerHTML=STEP1; step=1; }
-  let step=1;
-  const STEP1 = `[Has completado todos los requerimientos necesarios<br/>para la quest secreta ‘Coraje del Débil’.]`;
-  const STEP2 = `[Bienvenido, <span class="emph-green">Jugador</span>.]`;
-  const STEP3 = `<div>[Entrenamiento para volverte un gran guerrero.]</div>
-                 <div style="margin-top:8px;font-weight:800;letter-spacing:.1em">OBJETIVOS</div>
-                 <div class="muted" style="margin-top:6px">Completa los ejercicios listados.</div>`;
-  function closeIntro(){ overlay.classList.add("hidden"); document.body.classList.remove("intro-open"); }
-  alarmBtn.addEventListener("click", async ()=>{
-    if(step===1){ textEl.innerHTML=STEP2; step=2; return; }
-    if(step===2){ titleEl.textContent="DIRECCIONES DE LA QUEST"; textEl.innerHTML=STEP3; step=3; return; }
-    local.setIntro(); closeIntro(); appVisible(true);
-    const uid=auth.currentUser?.uid; if(uid){ ensureDailyReset(uid); await loadAll(uid); startDailyCountdown(uid); subscribeFriends(uid); }
+  // ===== Auth state =====
+  let unsubFriends=null;
+  auth.onAuthStateChanged(async (user)=>{
+    if(!user){
+      setAuthVisible(true); appVisible(false);
+      overlay.classList.add("hidden"); document.body.classList.remove("intro-open");
+      if(unsubFriends){ unsubFriends(); unsubFriends=null; }
+      return;
+    }
+    setAuthVisible(false);
+
+    // Asegurar username (para cuentas antiguas o recién creadas sin username)
+    await ensureUsernameWithModal(user.uid);
+
+    if(!local.getIntro()){
+      document.body.classList.add("intro-open"); openIntro();
+    }else{
+      document.body.classList.remove("intro-open"); appVisible(true);
+      ensureDailyReset(user.uid);
+      await loadAll(user.uid);
+      startDailyCountdown(user.uid);
+      subscribeFriends(user.uid);
+    }
   });
 
   // ===== Pintar local al arranque =====
-  function paintLocalOnBoot(){ 
-    const saved = local.getIntro();
-    if(!saved){ document.body.classList.add("intro-open"); }
-    paintQuests((()=>{ try{return JSON.parse(localStorage.getItem(QUESTS_KEY)||"{}");}catch{return{};} })());
-  }
-  paintLocalOnBoot();
+  (function paintLocalOnBoot(){ 
+    if(!local.getIntro()){ document.body.classList.add("intro-open"); }
+    // pinto quests locales por si ya hay algo en cache
+    try{ paintQuests(JSON.parse(localStorage.getItem(QUESTS_KEY)||"{}")); }catch{}
+  })();
 
 })();
