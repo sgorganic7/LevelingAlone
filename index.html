@@ -16,7 +16,10 @@
         <button id="tabLogin" class="tab" role="tab" aria-selected="false">Entrar</button>
       </div>
 
+      <!-- REGISTRO con NOMBRE DE USUARIO -->
       <form id="formRegister" class="auth-form" autocomplete="off">
+        <label>Nombre de usuario</label>
+        <input id="regUser" type="text" placeholder="Ej. ShadowHunter" minlength="3" maxlength="20" required />
         <label>Correo</label>
         <input id="regEmail" type="email" placeholder="tu@correo.com" required />
         <label>Contraseña</label>
@@ -25,6 +28,7 @@
         <div id="regMsg" class="muted"></div>
       </form>
 
+      <!-- LOGIN -->
       <form id="formLogin" class="auth-form hidden" autocomplete="off">
         <label>Correo</label>
         <input id="loginEmail" type="email" placeholder="tu@correo.com" required />
@@ -135,12 +139,12 @@
       </section>
     </section>
 
-    <!-- AMIGOS -->
+    <!-- AMIGOS: por NOMBRE DE USUARIO -->
     <section id="friendsView" class="view hidden">
       <section class="panel friends-panel has-runes">
         <h3>Amigos</h3>
         <form id="addFriendForm" class="add-friend-form" autocomplete="off">
-          <input id="friendEmail" type="email" placeholder="Correo del amigo" required />
+          <input id="friendUsername" type="text" placeholder="Nombre de usuario del amigo" required />
           <button class="btn" type="submit">Agregar</button>
           <span id="friendMsg" class="muted"></span>
         </form>
@@ -205,7 +209,24 @@
     </section>
   </main>
 
-  <!-- Firebase (sin Storage) -->
+  <!-- ===== MODAL: Elegir nombre de usuario ===== -->
+  <div id="usernameModal" class="uname-overlay hidden" aria-hidden="true">
+    <div class="uname-card has-runes" role="dialog" aria-modal="true" aria-labelledby="unameTitle" aria-describedby="unameDesc">
+      <h2 id="unameTitle">Elige tu nombre de usuario</h2>
+      <p id="unameDesc" class="uname-desc">Tu @usuario será único. Solo letras, números o guiones bajos (3–20).</p>
+
+      <form id="unameForm" class="uname-form" autocomplete="off">
+        <label for="unameInput">@usuario</label>
+        <input id="unameInput" type="text" placeholder="Ej. ShadowHunter" minlength="3" maxlength="20" required />
+        <button id="unameSave" class="btn wfull" type="submit">Guardar</button>
+        <div id="unameMsg" class="muted"></div>
+      </form>
+
+      <p class="uname-note">* No podrás continuar sin elegir un nombre válido y disponible.</p>
+    </div>
+  </div>
+
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>

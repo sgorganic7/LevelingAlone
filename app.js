@@ -4,7 +4,7 @@
     apiKey: "AIzaSyAFdZnQXPfAkIu74HJ7EXU5A2XKwOYjN44",
     authDomain: "ejercicio-f91ac.firebaseapp.com",
     projectId: "ejercicio-f91ac",
-    storageBucket: "ejercicio-f91ac.appspot.com", // no se usa en esta versión
+    storageBucket: "ejercicio-f91ac.appspot.com",
     messagingSenderId: "694493495253",
     appId: "1:694493495253:web:a192a5147fa3c46b5a875c",
     measurementId: "G-1J2PLMYNPR"
@@ -28,6 +28,7 @@
   const loginPass  = document.getElementById("loginPass");
   const regEmail   = document.getElementById("regEmail");
   const regPass    = document.getElementById("regPass");
+  const regUser    = document.getElementById("regUser");
   const authMsg    = document.getElementById("authMsg");
   const regMsg     = document.getElementById("regMsg");
   const btnReset   = document.getElementById("btnReset");
@@ -62,10 +63,11 @@
   const textEl = document.getElementById("alarm-text");
   const titleEl = document.getElementById("alarm-title");
 
-  // Amigos
+  // Amigos (por username)
   const addFriendForm = document.getElementById("addFriendForm");
-  const friendEmailInput = document.getElementById("friendEmail");
-  const friendMsg = document.getElementById("friendMsg");
+  const friendUsernameInput = document.getElementById("friendUsername");
+  theFriendMsg = document.getElementById("friendMsg");
+  const friendMsg = theFriendMsg; // evitar sombra por minificadores
   const friendsList = document.getElementById("friendsList");
 
   // Perfil propio
@@ -113,21 +115,52 @@
   tabRegister.addEventListener("click", showRegister);
   tabLogin.addEventListener("click", showLogin);
 
+  // ===== Username helpers =====
+  function cleanUsername(u){ return (u||"").trim().replace(/\s+/g,"_"); }
+  function isValidUsername(u){ return /^[a-zA-Z0-9_]{3,20}$/.test(u); }
+
+  // ===== Registro (con username único) =====
   formRegister.addEventListener("submit", async (e)=>{
     e.preventDefault();
-    regMsg.textContent="Creando cuenta…";
+    regMsg.textContent="Verificando nombre de usuario…";
     try{
+      let username = cleanUsername(regUser.value);
+      if(!isValidUsername(username)){
+        regMsg.textContent = "El nombre de usuario debe tener 3–20 caracteres (letras, números o _).";
+        return;
+      }
+      const usernameLower = username.toLowerCase();
+      const exists = await db.collection("users")
+        .where("usernameLower","==",usernameLower)
+        .limit(1).get();
+      if(!exists.empty){
+        regMsg.textContent = "Ese nombre de usuario ya está en uso. Elige otro.";
+        return;
+      }
+
+      regMsg.textContent="Creando cuenta…";
       const cred = await auth.createUserWithEmailAndPassword(regEmail.value, regPass.value);
+
       await db.collection("users").doc(cred.user.uid).set({
         email: regEmail.value,
-        profile: { name:"GUERRERO123", avatar:"", level:1, xp:0, xpMax:1000, rank:"E",
-          stats:{ fuerza:85, resistencia:72, agilidad:60 } },
-        quests: {}, createdAt: Date.now()
-      }, { merge:true });
+        username, usernameLower,
+        profile: {
+          name: username,
+          avatar: "",
+          level: 1, xp: 0, xpMax: 1000, rank: "E",
+          stats: { fuerza:85, resistencia:72, agilidad:60 }
+        },
+        quests: {},
+        createdAt: Date.now()
+      }, { merge: true });
+
       regMsg.textContent="Cuenta creada. Entrando…";
-    }catch(err){ regMsg.textContent="Error: " + (err.message || err.code); }
+    }catch(err){
+      regMsg.textContent="Error: " + (err?.message || err?.code || err);
+    }
   });
 
+  // ===== Login =====
   formLogin.addEventListener("submit", async (e)=>{
     e.preventDefault();
     authMsg.textContent="Entrando…";
@@ -161,6 +194,81 @@
   navLinks.forEach(n=>n.addEventListener("click", ()=>{ setView(n.dataset.view); closeDrawer(); }));
   btnSignOut.addEventListener("click", ()=> auth.signOut());
 
+  // ===== MODAL USERNAME (para cuentas antiguas) =====
+  function openUsernameModal() {
+    return new Promise((resolve) => {
+      const modal = document.getElementById("usernameModal");
+      const form  = document.getElementById("unameForm");
+      const input = document.getElementById("unameInput");
+      const msg   = document.getElementById("unameMsg");
+      const save  = document.getElementById("unameSave");
+
+      input.value = "";
+      msg.textContent = "";
+      modal.classList.remove("hidden");
+      modal.setAttribute("aria-hidden","false");
+      document.body.classList.add("uname-open");
+      input.focus();
+
+      async function onSubmit(e){
+        e.preventDefault();
+        let uname = cleanUsername(input.value);
+        if(!isValidUsername(uname)){
+          msg.textContent = "Usa 3–20 caracteres: letras, números o _.";
+          return;
+        }
+        msg.textContent = "Verificando disponibilidad…";
+        save.disabled = true;
+
+        try{
+          const exists = await db.collection("users")
+            .where("usernameLower","==", uname.toLowerCase())
+            .limit(1).get();
+          if(!exists.empty){
+            msg.textContent = "Ese nombre ya está en uso. Intenta otro.";
+            save.disabled = false;
+            return;
+          }
+          close();
+          resolve(uname);
+        }catch(err){
+          msg.textContent = "Error: " + (err.message || err.code || err);
+          save.disabled = false;
+        }
+      }
+
+      function onEsc(ev){ if(ev.key === "Escape"){ /* bloqueado */ } }
+      function close(){
+        modal.classList.add("hidden");
+        modal.setAttribute("aria-hidden","true");
+        document.body.classList.remove("uname-open");
+        form.removeEventListener("submit", onSubmit);
+        window.removeEventListener("keydown", onEsc);
+      }
+
+      form.addEventListener("submit", onSubmit);
+      window.addEventListener("keydown", onEsc);
+    });
+  }
+
+  async function ensureUsernameWithModal(uid){
+    const ref = db.collection("users").doc(uid);
+    const snap = await ref.get();
+    const data = snap.data() || {};
+    if (data.username && data.usernameLower) return;
+
+    const uname = await openUsernameModal();
+    await ref.set({
+      username: uname,
+      usernameLower: uname.toLowerCase(),
+      profile: {
+        ...(data.profile || {}),
+        name: (data.profile?.name) || uname
+      }
+    }, { merge:true });
+    alert(`¡Listo! Tu nombre de usuario es @${uname}`);
+  }
+
   // ===== Auth state =====
   let unsubFriends=null;
   auth.onAuthStateChanged(async (user)=>{
@@ -171,6 +279,9 @@
       return;
     }
     setAuthVisible(false);
+
+    // Asegura username (si la cuenta es vieja)
+    await ensureUsernameWithModal(user.uid);
 
     if(!local.getIntro()){
       document.body.classList.add("intro-open"); openIntro();
@@ -249,7 +360,7 @@
       const q = { ...localQ, ...data.quests }; saveLocal(q); paintQuests(q);
 
       const p = data.profile || {};
-      pcName.textContent = p.name || "GUERRERO123";
+      pcName.textContent = p.name || data.username || "GUERRERO123";
       pcAvatar.src = p.avatar || "data:image/svg+xml;utf8,"+encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='600' height='360'><rect width='100%' height='100%' fill='%230a0a0a'/></svg>");
       pcLevel.textContent = p.level ?? 1;
       pcXp.textContent = p.xp ?? 0;
@@ -269,7 +380,7 @@
   editTopBtn.addEventListener("click", async ()=>{
     const user = auth.currentUser; if(!user){ alert("Inicia sesión."); return; }
     const currName = pcName.textContent || "GUERRERO123";
-    const newName = prompt("Nuevo nombre para el perfil:", currName);
+    const newName = prompt("Nuevo nombre visible (no cambia tu @username):", currName);
     if(newName !== null){
       try{
         const snap = await db.collection("users").doc(user.uid).get();
@@ -281,7 +392,7 @@
     hiddenFile.click();
   });
 
-  // Convertir a Data-URL (JPEG comprimido) y guardar en Firestore
+  // Convertir a Data-URL (JPEG) y guardar en Firestore (campo profile.avatar)
   function fileToDataURL(file, max = 320, quality = 0.8) {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -314,20 +425,22 @@
       const snap = await db.collection("users").doc(user.uid).get();
       const p = (snap.data()||{}).profile || {};
       await db.collection("users").doc(user.uid).set({ profile: { ...p, avatar: dataURL } }, { merge:true });
-      pcAvatar.src = dataURL; // preview inmediata
+      pcAvatar.src = dataURL;
     }catch(err){ alert("Error preparando la imagen: "+(err.message||err)); }
     await refreshProfile();
   });
 
   async function refreshProfile(){ const uid=auth.currentUser?.uid; if(uid) await loadAll(uid); }
 
-  // ===== Amigos =====
+  // ===== Amigos (por username) =====
   function friendsCol(uid){ return db.collection("users").doc(uid).collection("friends"); }
   function friendCard(uid,data){
     const p=data.profile||{}; const q=data.quests||{};
     const total=["flexiones","sentadillas","abdominales1","correr"].reduce((a,k)=>a+(q[k]?1:0),0);
+    const display = p.name || data.username || "Jugador";
     return `<div class="friend" data-uid="${uid}">
-      <div class="meta"><div class="name">${p.name||"Jugador"}</div><div class="small">Nivel ${p.level??1} · Rango ${p.rank||"E"}</div></div>
+      <div class="meta"><div class="name">${display}</div>
+      <div class="small">@${(data.username||"unknown")}</div></div>
       <div class="score">${total}/4</div>
       <div class="actions"><button class="btn small view">Ver perfil</button><button class="btn small remove">Eliminar</button></div>
     </div>`;
@@ -342,20 +455,34 @@
       friendsList.innerHTML=cards.length?cards.join(""):`<div class="muted">Aún no has agregado amigos.</div>`;
     });
   }
+
   addFriendForm.addEventListener("submit", async e=>{
     e.preventDefault();
     friendMsg.textContent="Buscando…";
     const me=auth.currentUser; if(!me){ friendMsg.textContent="Inicia sesión"; return; }
-    const email=friendEmailInput.value.trim().toLowerCase(); if(!email){ friendMsg.textContent="Correo inválido."; return; }
-    if(me.email && me.email.toLowerCase()===email){ friendMsg.textContent="No puedes agregarte."; return; }
+    let raw = (friendUsernameInput.value || "").trim();
+
     try{
-      const q=await db.collection("users").where("email","==",email).limit(1).get();
-      if(q.empty){ friendMsg.textContent="No se encontró ese correo."; return; }
-      const target=q.docs[0];
-      await friendsCol(me.uid).doc(target.id).set({friendUid:target.id,addedAt:Date.now()},{merge:true});
-      friendMsg.textContent="Amigo agregado ✓"; friendEmailInput.value="";
+      // Permite temporalmente email (compatibilidad) o username
+      let targetSnap = null;
+      if (raw.includes("@")) {
+        const byEmail = await db.collection("users").where("email","==", raw.toLowerCase()).limit(1).get();
+        if (!byEmail.empty) targetSnap = byEmail.docs[0];
+      } else {
+        const uname = cleanUsername(raw);
+        if (!isValidUsername(uname)) { friendMsg.textContent="Nombre inválido (3–20, letras/números/_)."; return; }
+        const byUser = await db.collection("users").where("usernameLower","==", uname.toLowerCase()).limit(1).get();
+        if (!byUser.empty) targetSnap = byUser.docs[0];
+      }
+
+      if (!targetSnap) { friendMsg.textContent = "No se encontró."; return; }
+      if (targetSnap.id === me.uid) { friendMsg.textContent = "No puedes agregarte a ti mismo."; return; }
+
+      await friendsCol(me.uid).doc(targetSnap.id).set({friendUid:targetSnap.id, addedAt:Date.now()},{merge:true});
+      friendMsg.textContent="Amigo agregado ✓"; friendUsernameInput.value="";
     }catch(err){ friendMsg.textContent="Error: "+(err.message||err.code); }
   });
+
   friendsList.addEventListener("click", async e=>{
     const row = e.target.closest(".friend"); if(!row) return;
     const fuid = row.dataset.uid;
@@ -379,11 +506,12 @@
   }
   function renderFriendCard(container, data){
     const p = data.profile || {};
+    const display = p.name || data.username || "GUERRERO123";
     container.innerHTML = `
       <div class="pc-header"><div class="pc-frame">
         <img src="${p.avatar || "data:image/svg+xml;utf8,"+encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='600' height='360'><rect width='100%' height='100%' fill='%230a0a0a'/></svg>")}" alt="Avatar">
       </div></div>
-      <h2 class="pc-name">${p.name || "GUERRERO123"}</h2>
+      <h2 class="pc-name">${display}</h2>
       <div class="level-row">
         <div class="pill left">NIVEL <span>${p.level ?? 1}</span></div>
         <div class="pill right"><span>${p.xp ?? 0}</span>/<span>${p.xpMax ?? 1000}</span></div>
@@ -416,7 +544,11 @@
   }
   ppBack.addEventListener("click", ()=>{ publicProfileView.classList.add("hidden"); friendsView.classList.remove("hidden"); });
 
-  // Pintar local al arranque
-  paintQuests(local.getQuests());
+  // ===== Intro text =====
+  function paintIntro(stepTxt){ textEl.innerHTML = stepTxt; }
+
+  // ===== Pintar local al arranque =====
+  function paintLocalOnBoot(){ paintQuests(local.getQuests()); }
+  paintLocalOnBoot();
 
 })();
